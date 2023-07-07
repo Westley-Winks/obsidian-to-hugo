@@ -1,45 +1,42 @@
-<h1 align=center>
-<img src=https://raw.githubusercontent.com/devidw/obsidian-to-hugo/master/img/gopher-obsidian.png width=100 height=100>
-<br>
-Obsidian Vault to Hugo Content
-</h1>
+# Obsidian Vault to Hugo Content
 
-<p align="center">
-<a href="https://obsidian-to-hugo.wolf.gdn" target="_blank">
-<img src="https://raw.githubusercontent.com/devidw/obsidian-to-hugo/master/img/demo.gif">
-</a>
-</p>
+Lightweight, extensible, zero-dependency CLI written in Python to help us publish [Obsidian](https://obsidian.md) notes with [Hugo](https://gohugo.io). 
 
-Lightweight, extensible, zero-dependency CLI written in Python to help us publish [obsidian](https://obsidian.md) notes with [hugo](https://gohugo.io). 
+## Description
 
-It only takes two arguments: The obsidian vault directory (`--obsidian-vault-dir`) and the hugo content directory (`--hugo-content-dir`).
+My Obsidian vault and my Hugo site are two completely different systems with wildly different directory structures. I do all of my writing in Obsidian and simply use Hugo as a place to publish that writing. As such, I wanted a tool that updated my Hugo content that is driven entirely by changes made in my Obsidian vault.
 
-```console
-python -m obsidian_to_hugo --obsidian-vault-dir=<path> --hugo-content-dir=<path>
-```
+This tool directly copies specified directories into Hugo `content` folder, maintaining the directory structure in the process. It flattens the rest of the vault and dumps into a `content/writing` directory all while maintaining leaf bundles.
 
-It takes care of the following steps:
+### Features
 
-- Clears hugo content directory (directory will be deleted and recreated)
-- Copies obsidian vault contents into hugo content directory (`.obsidian` gets removed immediately after copying)
-- Replaces obsidian wiki links (`[[wikilink]]`) with hugo shortcode links
+- Clears Hugo content directory
+- Copies Obsidian vault contents into Hugo content directory
+- Maintains folder structure for directories you specify
+- Flattens and dumps all other notes to `content/writing`
+- Maintains all notes as Hugo leaf bundles
+- Deletes all file types except for `md` files and images that are within a leaf bundle
+- Replaces Obsidian wiki links (`[[wikilink]]`) with Hugo shortcode links
   (`[wikilink]({{< ref "wikilink" >}})`)
+- Replaces Obsidian image wiki links (`![[some_image.jpg]]`) with Hugo shortcode links (`{{< image some_image.jpg \>}}`)
 - Replaces obsidian marks (`==important==`) with HTML marks (`<mark>important</mark>`)
+- Removes imported Kindle highlights under any `## Highlights` header
 - Want to do more? You can write and register custom [filters](#filters) to dynamically
   include/exclude content from processing and [processors](#processors) to do whatever
   you want with the file contents.
 
-
-## Replacement examples
+### Processing Examples
 
 | Obsidian | Hugo
-| -------- | --------
-| ![](https://raw.githubusercontent.com/devidw/obsidian-to-hugo/master/img/obsidian.png) | ![](https://raw.githubusercontent.com/devidw/obsidian-to-hugo/master/img/hugo.png)
+| -------- | -------- 
 | `[[/some/wiki/link]]` | `[/some/wiki/link]({{< ref "/some/wiki/link" >}})`
 | `[[/some/wiki/link\|Some text]]` | `[Some text]({{< ref "/some/wiki/link" >}})`
 | `[[/some/wiki/link/_index]]` | `[/some/wiki/link/]({{< ref "/some/wiki/link/" >}})`
 | `[[/some/wiki/link#Some Heading\|Some Heading Link]]` | `[Some Heading Link]({{< ref "/some/wiki/link#some-heading" >}})`
 | `==foo bar===` | `<mark>foo bar</mark>`
+| `![[some_image.jpg]]` | `![](some_image.jpg)`
+| `![[some_image.jpg\|692]]` | `{{< image some_image.jpg Resize "692x" \>}}`
+
 
 > **Note**
 > For now, there is *no way to escape* obsidian wiki links. Every link
@@ -51,13 +48,21 @@ It takes care of the following steps:
 > practice, so if anyone wants to implement real escaping, [please do
 > so](https://github.com/devidw/obsidian-to-hugo/pulls).
 
+### Obsidian Requirements
+
+Obsidian structure must follow [Hugo leaf bundle](https://gohugo.io/content-management/page-bundles/#leaf-bundles) structure. If a note contains images, put the note and all images in the same folder **with the note being named index.md** to maintain leaf bundles and associated images.
 
 ## Installation
 
-```console
-pip install obsidian-to-hugo
-```
+For now, clone the project and install locally.
 
+```console
+git clone https://github.com/Westley-Winks/obsidian-to-hugo.git
+
+cd obsidian-to-hugo
+
+make install_locally
+```
 
 ## Usage
 
@@ -76,7 +81,9 @@ options:
                         from.
 ```
 
-## Python API
+### Python API
+
+This file goes in your Hugo site in `scripts`.
 
 ```python
 from obsidian_to_hugo import ObsidianToHugo
@@ -89,8 +96,7 @@ obsidian_to_hugo = ObsidianToHugo(
 obsidian_to_hugo.run()
 ```
 
-
-### Filters
+#### Filters
 
 You can pass an optional `filters` argument to the `ObsidianToHugo`
 constructor. This argument should be a list of functions.
@@ -122,8 +128,7 @@ obsidian_to_hugo = ObsidianToHugo(
 obsidian_to_hugo.run()
 ```
 
-
-### Processors
+#### Processors
 
 You can pass an optional `processors` argument to the `ObsidianToHugo`
 constructor. This argument should be a list of functions.
@@ -149,3 +154,45 @@ obsidian_to_hugo = ObsidianToHugo(
 
 obsidian_to_hugo.run()
 ```
+
+#### Direct copies
+
+For the directories that you want to copy the exact structure of and put into `content` as is, add the `direct_copies` argument to the `ObsidianToHugo` constructor. This should be a list of paths to the directories in your obsidian vault.
+
+This will put the same structure into a directory of the same name in `content` in your Hugo site.
+
+```python
+from obsidian_to_hugo import ObsidianToHugo
+
+obsidian_to_hugo = ObsidianToHugo(
+    obsidian_vault_dir="path/to/obsidian/vault",
+    hugo_content_dir="path/to/hugo/content",
+    direct_copies = ["path/to/direct/copy/folder"]
+)
+
+obsidian_to_hugo.run()
+```
+
+#### Exclusions
+
+For the sensitive directories that you don't want `obsidian-to-hugo` to look at, add the `copy_exclusions` argument to the `ObsidianToHugo` constructor. This should be a list of directory names. `obsidian-to-hugo` will skip these entirely during the copy step.
+
+```python
+from obsidian_to_hugo import ObsidianToHugo
+
+obsidian_to_hugo = ObsidianToHugo(
+    obsidian_vault_dir="path/to/obsidian/vault",
+    hugo_content_dir="path/to/hugo/content",
+    copy_exclusions = ["folders", "to", "skip"]
+)
+
+obsidian_to_hugo.run()
+```
+
+## Contributing
+
+This project is geared to my own specific use case and I kind of built it just for me. However, if you have some ideas to make it more robust and generally useful please submit a pull request.
+
+## Authors and Acknowledgment
+
+This is a direct fork from [David Wolf's obsidian-to-hugo project](https://github.com/devidw/obsidian-to-hugo). Huge thank you to them for doing most of the work. Check out their [really cool website](https://david.wolf.gdn/) while you are at it.
